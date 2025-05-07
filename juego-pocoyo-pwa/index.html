@@ -1,0 +1,226 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Juego de Pocoyó</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#aee1f9">
+  <style>
+    body {
+      margin: 0;
+      background-color: #aee1f9;
+      font-family: sans-serif;
+    }
+    #titulo {
+      display: block;
+      margin: 20px auto;
+      width: 300px;
+    }
+    #gameArea {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #aee1f9;
+    }
+    .contenedor {
+      position: absolute;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #contenedor-pocoyo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #contenedor-nina {
+      position: absolute;
+      left: 100px;
+      bottom: 50px;
+    }
+    #contenedor-pato {
+      position: absolute;
+      right: 100px;
+      bottom: 50px;
+    }
+    .personaje {
+      width: 100px;
+      height: auto;
+    }
+    .globito {
+      position: absolute;
+      background: white;
+      padding: 8px 12px;
+      border-radius: 12px;
+      box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+      font-size: 16px;
+      display: none;
+      z-index: 10;
+      white-space: nowrap;
+    }
+    .globito::after {
+      content: "";
+      position: absolute;
+      bottom: -10px;
+      left: 20px;
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 10px solid white;
+    }
+    .brillo {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: radial-gradient(circle, white 0%, transparent 60%);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: fadeOut 0.6s forwards;
+      opacity: 0.8;
+      z-index: 5;
+    }
+    @keyframes fadeOut {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(2); opacity: 0; }
+    }
+  </style>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          console.log("Service Worker registrado:", reg);
+        }).catch(err => {
+          console.error("Error al registrar Service Worker:", err);
+        });
+      });
+    }
+  </script>
+</head>
+<body>
+  <img id="titulo" src="https://fontmeme.com/images/pocoyo-logo-font.png" alt="Pocoyó">
+  <div id="gameArea">
+    <div class="contenedor" id="contenedor-pocoyo">
+      <img id="pocoyo" class="personaje" src="https://cdn.prod.website-files.com/662fb92f905585b61b12afd8/66632b8ae7566a20dd1f37f9_characters_pocoyo.webp" alt="Pocoyó">
+    </div>
+    <div class="contenedor" id="contenedor-nina">
+      <img id="nina" class="personaje" src="https://static.wikia.nocookie.net/pocoyoworld/images/0/04/Elly.png/revision/latest?cb=20170901055334" alt="Nina">
+    </div>
+    <div class="contenedor" id="contenedor-pato">
+      <img id="pato" class="personaje" src="https://cdn.prod.website-files.com/662fb92f905585b61b12afd8/66632b8acd1640c48dc4f4a3_characters_pato.webp" alt="Pato">
+    </div>
+    <div id="mensaje" class="globito">¡Hola!</div>
+  </div>
+  <audio id="sonido-pasos" src="running-43089.mp3" preload="auto"></audio>
+  <script>
+    window.onload = function() {
+      const pocoyo = document.getElementById("contenedor-pocoyo");
+      const mensaje = document.getElementById("mensaje");
+      let posX = window.innerWidth / 2 - 50;
+      let posY = 400;
+      const speed = 5;
+      pocoyo.style.left = `${posX}px`;
+      pocoyo.style.top = `${posY}px`;
+      function movePocoyo(xAxis, yAxis) {
+        if (xAxis !== 0 || yAxis !== 0) {
+          const sonido = document.getElementById("sonido-pasos");
+          if (sonido.paused) {
+            sonido.currentTime = 0;
+            sonido.play().catch(() => {});
+          }
+        }
+        posX += xAxis * speed;
+        posY += yAxis * speed;
+        posX = Math.max(0, Math.min(window.innerWidth - 100, posX));
+        posY = Math.max(0, Math.min(window.innerHeight - 200, posY));
+        pocoyo.style.left = `${posX}px`;
+        pocoyo.style.top = `${posY}px`;
+        crearBrillo(posX + 50, posY + 50);
+        checkCollision();
+      }
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") movePocoyo(-1, 0);
+        if (e.key === "ArrowRight") movePocoyo(1, 0);
+        if (e.key === "ArrowUp") movePocoyo(0, -1);
+        if (e.key === "ArrowDown") movePocoyo(0, 1);
+      });
+      function gameLoop() {
+        const gamepads = navigator.getGamepads();
+        if (gamepads[0]) {
+          const x = gamepads[0].axes[0];
+          const y = gamepads[0].axes[1];
+          if (Math.abs(x) > 0.1 || Math.abs(y) > 0.1) {
+            movePocoyo(x, y);
+          } else {
+            const sonido = document.getElementById("sonido-pasos");
+            if (!sonido.paused) sonido.pause();
+          }
+        }
+        requestAnimationFrame(gameLoop);
+      }
+      window.addEventListener("gamepadconnected", () => {
+        console.log("Gamepad conectado");
+        gameLoop();
+      });
+      setInterval(() => {
+        posX = window.innerWidth / 2 - 50;
+        posY = 400;
+        pocoyo.style.left = `${posX}px`;
+        pocoyo.style.top = `${posY}px`;
+      }, 15000);
+      function checkCollision() {
+        const pocoyoBox = pocoyo.getBoundingClientRect();
+        const nina = document.getElementById("contenedor-nina");
+        const pato = document.getElementById("contenedor-pato");
+        const ninaBox = nina.getBoundingClientRect();
+        const patoBox = pato.getBoundingClientRect();
+        if (isClose(pocoyoBox, ninaBox)) {
+          mostrarMensaje("¡Hola, Nina!", nina);
+        } else if (isClose(pocoyoBox, patoBox)) {
+          mostrarMensaje("¡Hola, Pato!", pato);
+        } else {
+          mensaje.style.display = "none";
+        }
+      }
+      function isClose(a, b) {
+        const dx = a.left - b.left;
+        const dy = a.top - b.top;
+        return Math.sqrt(dx * dx + dy * dy) < 80;
+      }
+      function mostrarMensaje(texto, personajeDiv) {
+        mensaje.textContent = texto;
+        const personajeBox = personajeDiv.getBoundingClientRect();
+        const areaBox = document.getElementById("gameArea").getBoundingClientRect();
+        const offsetX = personajeBox.left - areaBox.left + personajeBox.width / 2;
+        const offsetY = personajeBox.top - areaBox.top;
+        mensaje.style.left = `${offsetX - mensaje.offsetWidth / 2}px`;
+        mensaje.style.top = `${offsetY - 50}px`;
+        mensaje.style.display = "block";
+        clearTimeout(mensaje.timeout);
+        mensaje.timeout = setTimeout(() => {
+          mensaje.style.display = "none";
+        }, 1500);
+      }
+      document.addEventListener("click", () => {
+        const sonido = document.getElementById("sonido-pasos");
+        sonido.play().catch(() => {});
+        sonido.pause();
+      }, { once: true });
+    }
+    function crearBrillo(x, y) {
+      const brillo = document.createElement("div");
+      brillo.className = "brillo";
+      brillo.style.left = x + "px";
+      brillo.style.top = y + "px";
+      document.getElementById("gameArea").appendChild(brillo);
+      setTimeout(() => {
+        brillo.remove();
+      }, 600);
+    }
+  </script>
+</body>
+</html>
